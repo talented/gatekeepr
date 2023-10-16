@@ -1,0 +1,26 @@
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8slocalstoragerequiresafetoevict
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sLocalStorageRequireSafeToEvict
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8slocalstoragerequiresafetoevict
+
+        violation[{"msg": msg}] {
+          input.review.object.spec.volumes[_].emptyDir
+          not input.review.object.metadata.annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"]
+          msg := sprintf("Pod %v is using local storage but doesn't have the required annotation for eviction safety.", [input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.spec.volumes[_].hostPath
+          not input.review.object.metadata.annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"]
+          msg := sprintf("Pod %v is using local storage but doesn't have the required annotation for eviction safety.", [input.review.object.metadata.name])
+        }
