@@ -24,19 +24,26 @@ spec:
           newSet = {x | x := arr[_]}
         }
 
-        is_required_annotation(x, k) {
-          _ = x[k]
+        # Check if the required annotation is missing or set to false in the provided annotations
+        is_missing_or_false_annotation(required, provided) {
+          not provided[required]
+        } else = true {
+          provided[required] != "true"
         }
 
-        flatten_map(obj) = annotations {
-          keyVals := [s | s = key; val = obj[key]]
-          keysStr := concat(",", keyVals)
-          annotations := split(keysStr, ",")
+        violation[{"msg": msg, "details": {}}] {
+          input.review.object.spec.volumes[_].emptyDir
+          providedAnnotations := input.review.object.metadata.annotations
+          requiredAnnotations := to_set(input.parameters.annotations)
+          count({missingAnnotation | missingAnnotation = requiredAnnotations[_]; is_missing_or_false_annotation(missingAnnotation, providedAnnotations)}) > 0
+          msg := sprintf("Pod is using local storage but doesn't have the required annotation '%v' set to true for eviction safety", [requiredAnnotations[_]])
         }
 
-        violation[{"msg": msg}] {
-          providedAnnotation := flatten_map(input.review.object.metadata.annotations)[_]
-          requiredAnnotation := to_set(input.parameters.annotations)
-          is_required_annotation(requiredAnnotation, providedAnnotation)
-          msg := sprintf("Pod %v is using local storage but doesn't have the required annotation for eviction safety", [requiredAnnotation])
+        violation[{"msg": msg, "details": {}}] {
+          input.review.object.spec.volumes[_].hostPath
+          providedAnnotations := input.review.object.metadata.annotations
+          requiredAnnotations := to_set(input.parameters.annotations)
+          count({missingAnnotation | missingAnnotation = requiredAnnotations[_]; is_missing_or_false_annotation(missingAnnotation, providedAnnotations)}) > 0
+          msg := sprintf("Pod is using local storage but doesn't have the required annotation '%v' set to true for eviction safety", [requiredAnnotations[_]])
         }
+
